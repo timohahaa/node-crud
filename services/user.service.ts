@@ -1,26 +1,30 @@
 import bcrypt from 'bcrypt';
-import { DataSource } from 'typeorm';
+import { Repository } from 'typeorm';
 import { User } from '../entity/user';
 
 
+// решил передавать в класс не DataSource, а конечный репозиторий, так как так будет легче рефакторить и поддерживать в дальнейшем
+// + это more general, потом будет легче сменить ОРМ
 export class UserService {
-    private db: DataSource
+    //    private db: DataSource;
+    private userRepo: Repository<User>;
 
-    public constructor(postgres: DataSource) {
-        this.db = postgres;
+    public constructor(userRepo: Repository<User>) {
+        //        this.db = postgres;
+        this.userRepo = userRepo;
     }
 
     // CRUD
 
     public async createUser(firslName: string, lastName: string, password: string, email: string, image: Buffer): Promise<number> {
-        const userRepo = this.db.getRepository(User);
         // проверить что такого пользователя еще не существует
-        const existingUser = await userRepo.findOneBy({ email: email });
+        const existingUser: User | null = await this.userRepo.findOneBy({ email: email });
         if (existingUser != null) {
             throw new Error(`user with email ${email} already exists!`);
         }
+
         // такого пользователя нет, создадим и сохраним его
-        const newUser = new User();
+        const newUser: User = new User();
         newUser.firstName = firslName;
         newUser.lastName = lastName;
         newUser.email = email;
@@ -28,15 +32,13 @@ export class UserService {
 
         const hashedPassword: string = await bcrypt.hash(password, 10);
         newUser.password = hashedPassword;
-        await userRepo.save(newUser);
+        await this.userRepo.save(newUser);
 
         return newUser.id;
     }
 
     public async readUser(email: string): Promise<User> {
-        const userRepo = this.db.getRepository(User);
-
-        const user = await userRepo.findOneBy({ email: email });
+        const user: User | null = await this.userRepo.findOneBy({ email: email });
         if (user != null) {
             return user;
         }
@@ -46,12 +48,12 @@ export class UserService {
     }
 
     public async updateUser(email: string, firstName?: string, lastName?: string, password?: string, image?: Buffer): Promise<number> {
-        const userRepo = this.db.getRepository(User);
         // проверить что такой пользователь существует
-        const existingUser = await userRepo.findOneBy({ email: email });
+        const existingUser: User | null = await this.userRepo.findOneBy({ email: email });
         if (existingUser == null) {
             throw new Error(`user with email ${email} does not exist!`);
         }
+
         // заполняем данные по пользователю
         if (firstName != undefined) {
             existingUser.firstName = firstName;
@@ -66,17 +68,17 @@ export class UserService {
             const hashedPassword: string = await bcrypt.hash(password, 10);
             existingUser.password = hashedPassword;
         }
+
         // сохраняем пользователя
-        await userRepo.save(existingUser);
+        await this.userRepo.save(existingUser);
 
         return existingUser.id;
     }
 
     public async deleteUser(email: string) {
-        const userRepo = this.db.getRepository(User);
         // можно не проверять, что пользователя не существует
         // если его не существует, в базе как раз ничего не удалится
-        await userRepo.delete({ email: email });
+        await this.userRepo.delete({ email: email });
 
     }
 }
