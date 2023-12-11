@@ -17,9 +17,19 @@ export class User {
     @Column({ type: "varchar", length: 100, nullable: false, unique: true })
     email!: string;
 
-    @Column({ type: "bytea", })
+    @Column({ type: "bytea", nullable: true })
     image!: Buffer;
 
-    @Column({ type: "bytea", })
+    @Column({ type: "bytea", nullable: true })
     pdf!: Buffer;
+
+    // чтобы легче было возвращать пользователя в хттп-контроллерах
+    toJson(): any {
+        return {
+            firstName: this.firstName,
+            lastName: this.lastName,
+            email: this.email,
+            image: this.image.toString('base64'),
+        }
+    }
 }

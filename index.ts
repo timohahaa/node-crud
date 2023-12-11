@@ -20,9 +20,10 @@ async function startServer() {
         process.exit(1);
     }
 
-    app.get('/', (req: Request, res: Response) => {
-        res.status(200).send("Healthcheck!");
-    });
+    //    app.get('/', (req: Request, res: Response) => {
+    //        res.status(200).send("Healthcheck!");
+    //    });
+    app.use(express.json());
 
     addUserRoutes(app, db);
 
