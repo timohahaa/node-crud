@@ -1,12 +1,15 @@
 import express, { Express, Request, Response, Router } from 'express';
+import jwt from 'jsonwebtoken';
 import { UserService } from '../services/user.service';
 import { DataSource } from 'typeorm';
 import { User } from '../entity/user';
+import authMiddleware from '../middleware/auth';
 
 export function addUserRoutes(app: Express, db: DataSource) {
     const r: Router = express.Router();
     const userService: UserService = new UserService(db.getRepository(User));
 
+    //  при создании пользователя возвращаем ему jwt-токен для дальнейшей авторизации
     r.post('/create', async (req: Request, resp: Response) => {
         if (req.method != "POST") {
             resp.status(405).send();
@@ -44,13 +47,17 @@ export function addUserRoutes(app: Express, db: DataSource) {
 
         try {
             const userId: number = await userService.createUser(firstName, lastName, password, email, imageBuffer);
-            resp.status(201).json({ userId: userId });
+            const payload = { userId: userId };
+            const token: string = jwt.sign(payload, process.env.JWT_SECRET!);
+            resp.status(201).json({ token: token });
         } catch (error: any) {
             resp.status(409).json({ error: `${error.message}` });
             return;
         }
     })
 
+    // для последующих методов нужна авторизация
+    r.use(authMiddleware);
     r.get('/read', async (req: Request, resp: Response) => {
         if (req.method != "GET") {
             resp.status(405).send();
@@ -108,6 +115,50 @@ export function addUserRoutes(app: Express, db: DataSource) {
         await userService.deleteUser(email);
 
         resp.status(200).send()
+    })
+
+    r.post('/pdf', async (req: Request, resp: Response) => {
+        if (req.method != "POST") {
+            resp.status(405).send();
+            return;
+        }
+        if (req.body.email === null || req.body.email === undefined) {
+            resp.status(400).send("email is required");
+            return;
+        }
+
+        const email: string = String(req.body.email);
+        try {
+            const exists: boolean = await userService.createPdf(email);
+            resp.status(200).json({ exists: exists });
+        } catch (error: any) {
+            resp.status(409).json({ error: `${error.message}` });
+            return;
+        }
+    })
+
+    r.get('/pdf', async (req: Request, resp: Response) => {
+        if (req.method != "GET") {
+            resp.status(405).send();
+            return;
+        }
+        if (req.body.email === null || req.body.email === undefined) {
+            resp.status(400).send("email is required");
+            return;
+        }
+
+        const email: string = String(req.body.email);
+        try {
+            const pdfData: Buffer = await userService.getPdf(email);
+            resp.set({
+                "Content-Type": "application/pdf",
+                "Content-Disposition": "attachment; filename=user.pdf"
+            })
+            resp.status(200).send(pdfData);
+        } catch (error: any) {
+            resp.status(409).json({ error: `${error.message}` });
+            return;
+        }
     })
 
     app.use('/user', r);
