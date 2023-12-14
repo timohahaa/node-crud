@@ -1,0 +1,28 @@
+version: "3"
+
+services:
+  postgres:
+    container_name: postgres
+    image: postgres:14.10
+    env_file: ./.env
+    ports:
+      - 5433:5432
+    volumes:
+      - db-data:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_USER=${DB_USERNAME}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${DB_NAME}
+
+  app:
+    container_name: appj
+    build: .
+    env_file: ./.env
+    restart: always
+    ports: 
+      - ${SERVER_PORT}:${SERVER_PORT}
+    depends_on:
+     - postgres
+
+volumes:
+  db-data:
